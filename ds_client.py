@@ -31,25 +31,21 @@ def send(server:str, port:int, username:str, password:str, message:str, bio:str=
 
       print("ICS32 client connected to "+ f"{server} on {port}")
 
-      join_json = dict_to_json({"join" : {"username" : username, "password" : password, "token" : ""}})
+      join_json = ds_protocol.dict_to_json({"join" : {"username" : username, "password" : password, "token" : ""}})
       send_json_to_server(send, join_json)
       response_info = get_response_from_server(recv)
 
-      post_json = dict_to_json({"token" : response_info.token, "post" : {"entry" : message, "timestamp" : time()}})
+      post_json = ds_protocol.dict_to_json({"token" : response_info.token, "post" : {"entry" : message, "timestamp" : time()}})
       send_json_to_server(send, post_json)
 
       if bio != None:
-        bio_json = dict_to_json({"token" : response_info.token, "bio" : {"entry" : bio, "timestamp" : time()}})
+        bio_json = ds_protocol.dict_to_json({"token" : response_info.token, "bio" : {"entry" : bio, "timestamp" : time()}})
         send_json_to_server(send, bio_json)
  
     return True
     
   except:
      return False
-
-# turns a dictionary value into a json string
-def dict_to_json(command_dict) -> str:
-  return str(command_dict).replace("\'", "\"")
 
 # sends a json string to the remote server
 def send_json_to_server(send, json_msg:str):
