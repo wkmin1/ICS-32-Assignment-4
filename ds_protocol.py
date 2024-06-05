@@ -10,6 +10,7 @@
 
 import json
 from collections import namedtuple
+import socket
 
 # Namedtuple to hold the values retrieved from json messages.
 MESSAGE_KEY = 'type'
@@ -31,8 +32,10 @@ def extract_json(json_msg:str) -> ResponseInfo:
 
   return ResponseInfo(message_type, token)
 
-def direct_message(json_msg:str):
-  pass
+def direct_message(send, recv, response_info, direct_message) -> ResponseInfo:
+  json_msg = dict_to_json({"token" : response_info.token, "directmessage" : direct_message})
+  send_json_to_server(send, json_msg)
+  return recv.readline()
 
 # turns a dictionary value into a json string
 def dict_to_json(command_dict) -> str:
@@ -41,4 +44,29 @@ def dict_to_json(command_dict) -> str:
 # turns a json string into a dictionary value
 def json_to_dict(json_msg:str) -> dict:
   return json.loads(json_msg)
+
+# sends a json string to the remote server
+def send_json_to_server(send, json_msg:str):
+  send.write(json_msg + "\r\n")
+  send.flush()
+
+# retrieves response from server
+def get_response_from_server(recv) -> ResponseInfo:
+  srv_msg = recv.readline()
+  return extract_json(srv_msg)
+
+def setup_connection(server:str, port:int, username:str, password:str):
+  client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+  client.connect((server, port))
+
+  send = client.makefile("w")
+  recv = client.makefile("r")
+
+  print("ICS32 client connected to "+ f"{server} on {port}")
+
+  join_json = dict_to_json({"join" : {"username" : username, "password" : password, "token" : ""}})
+  send_json_to_server(send, join_json)
+  response_info = get_response_from_server(recv)
+
+  return (send, recv, response_info)
   
