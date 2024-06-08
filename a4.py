@@ -1,6 +1,7 @@
 import tkinter as tk
 from tkinter import ttk, filedialog
 from typing import Text
+from ds_messenger import DirectMessenger
 
 
 class Body(tk.Frame):
@@ -43,6 +44,42 @@ class Body(tk.Frame):
         self.message_editor.delete(1.0, tk.END)
         self.message_editor.insert(1.0, text)
 
+    def update_contacts(self, contacts:list[str]):
+        for child in self.posts_tree.get_children():
+            self.posts_tree.delete(child)
+
+        for contact in contacts:
+            if contact is not None:
+                self.insert_contact(contact)
+
+    def update_messages(self, dms:list, other_dms:list):
+        self.entry_editor.delete(1.0, tk.END)
+        dm_index = 0
+        other_dm_index = 0
+        dm = None
+        other_dm = None
+
+        while dm_index < len(dms) or other_dm_index < len(other_dms):
+            if dm is None and dm_index < len(dms):
+                dm = dms[dm_index]
+
+            if other_dm is None and other_dm_index < len(other_dms):
+                other_dm = other_dms[other_dm_index]
+
+            dm_time = 0 if dm is None else dm.get_time()
+            other_dm_time = 0 if other_dm is None else other_dm.get_time()
+            timestamp = max(dm_time, other_dm_time)
+
+            if abs(timestamp - dm_time) < 0.0001:
+                self.insert_user_message(dm.get_entry())
+                dm_index += 1
+                dm = None
+
+            if abs(timestamp - other_dm_time) < 0.0001:
+                self.insert_contact_message(other_dm.get_entry())
+                other_dm_index += 1
+                other_dm = None
+
     def _draw(self):
         posts_frame = tk.Frame(master=self, width=250)
         posts_frame.pack(fill=tk.BOTH, side=tk.LEFT)
@@ -82,25 +119,27 @@ class Body(tk.Frame):
 
 
 class Footer(tk.Frame):
-    def __init__(self, root, send_callback=None):
+    def __init__(self, root, send_callback=None, add_contact_callback=None):
         tk.Frame.__init__(self, root)
         self.root = root
         self._send_callback = send_callback
+        self._add_contact_callback = add_contact_callback
         self._draw()
 
     def send_click(self):
         if self._send_callback is not None:
             self._send_callback()
 
+    def add_contact_click(self):
+        if self._add_contact_callback is not None:
+            self._add_contact_callback()
+
     def _draw(self):
-        save_button = tk.Button(master=self, text="Send", width=20)
-        # You must implement this.
-        # Here you must configure the button to bind its click to
-        # the send_click() function.
+        save_button = tk.Button(master=self, text="Send", width=10, command=self.send_click)
         save_button.pack(fill=tk.BOTH, side=tk.RIGHT, padx=5, pady=5)
 
-        self.footer_label = tk.Label(master=self, text="Ready.")
-        self.footer_label.pack(fill=tk.BOTH, side=tk.LEFT, padx=5)
+        save_button = tk.Button(master=self, text="Add Contact", width=20, command=self.add_contact_click)
+        save_button.pack(fill=tk.BOTH, side=tk.LEFT, padx=5, pady=5)
 
 
 class NewContactDialog(tk.simpledialog.Dialog):
@@ -129,8 +168,12 @@ class NewContactDialog(tk.simpledialog.Dialog):
         # but you will want to add self.password_entry['show'] = '*'
         # such that when the user types, the only thing that appears are
         # * symbols.
-        #self.password...
-
+        self.password_label = tk.Label(frame, width=30, text="Password")
+        self.password_label.pack()
+        self.password_entry = tk.Entry(frame, width=30)
+        self.password_entry["show"] = "*"
+        self.password_entry.insert(tk.END, self.user)
+        self.password_entry.pack()
 
     def apply(self):
         self.user = self.username_entry.get()
@@ -142,33 +185,36 @@ class MainApp(tk.Frame):
     def __init__(self, root):
         tk.Frame.__init__(self, root)
         self.root = root
+        self.direct_messenger = DirectMessenger()
         self.username = ''
         self.password = ''
-        self.server = ''
+        self.server = '168.235.86.101'
         self.recipient = ''
-        # You must implement this! You must configure and
-        # instantiate your DirectMessenger instance after this line.
-        #self.direct_messenger = ... continue!
 
         # After all initialization is complete,
         # call the _draw method to pack the widgets
         # into the root frame
         self._draw()
-        self.body.insert_contact("studentexw23") # adding one example student.
+        
 
     def send_message(self):
-        # You must implement this!
-        pass
+        self.direct_messenger.send(self.body.get_text_entry(), self.recipient)
+        self.body.set_text_entry("")
+        self.update_app()
 
     def add_contact(self):
         # You must implement this!
         # Hint: check how to use tk.simpledialog.askstring to retrieve
         # the name of the new contact, and then use one of the body
         # methods to add the contact to your contact list
-        pass
+        new_contact = tk.simpledialog.askstring("Add New Direct Dialog", "New Contact")
+        self.direct_messenger.profile.add_contact(new_contact)
+        self.body.insert_contact(new_contact)
+        self.direct_messenger.save_messenger()
 
     def recipient_selected(self, recipient):
         self.recipient = recipient
+        self.update_app()
 
     def configure_server(self):
         ud = NewContactDialog(self.root, "Configure Account",
@@ -179,14 +225,24 @@ class MainApp(tk.Frame):
         # You must implement this!
         # You must configure and instantiate your
         # DirectMessenger instance after this line.
+        self.direct_messenger.save_messenger()
+        
+        self.direct_messenger = DirectMessenger(self.server, self.username, self.password)
 
-    def publish(self, message:str):
-        # You must implement this!
-        pass
+        self.recipient_selected(self.direct_messenger.profile.get_contacts()[0] if len(self.direct_messenger.profile.get_contacts()) > 0 else '')
 
     def check_new(self):
-        # You must implement this!
-        pass
+        new_list = self.direct_messenger.retrieve_new()
+
+        if new_list is not None:
+            self.update_app()
+
+        print("loop")
+        self.root.after(1000, self.check_new)
+
+    def update_app(self):
+        self.body.update_messages(self.direct_messenger.sent_dms(self.recipient), self.direct_messenger.received_dms(self.recipient))
+        self.body.update_contacts(self.direct_messenger.profile.get_contacts())
 
     def _draw(self):
         # Build a menu and add it to the root frame.
@@ -211,9 +267,8 @@ class MainApp(tk.Frame):
         self.body = Body(self.root,
                          recipient_selected_callback=self.recipient_selected)
         self.body.pack(fill=tk.BOTH, side=tk.TOP, expand=True)
-        self.footer = Footer(self.root, send_callback=self.send_message)
+        self.footer = Footer(self.root, send_callback=self.send_message, add_contact_callback=self.add_contact)
         self.footer.pack(fill=tk.BOTH, side=tk.BOTTOM)
-
 
 if __name__ == "__main__":
     # All Tkinter programs start with a root window. We will name ours 'main'.
@@ -245,8 +300,7 @@ if __name__ == "__main__":
     # behavior of the window changes.
     main.update()
     main.minsize(main.winfo_width(), main.winfo_height())
-    id = main.after(2000, app.check_new)
-    print(id)
+    id = main.after(1000, app.check_new)
     # And finally, start up the event loop for the program (you can find
     # more on this in lectures of week 9 and 10).
     main.mainloop()

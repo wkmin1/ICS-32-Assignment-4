@@ -13,10 +13,11 @@ from collections import namedtuple
 import socket
 
 # Namedtuple to hold the values retrieved from json messages.
-MESSAGE_KEY = 'type'
+TYPE_KEY = 'type'
 TOKEN_KEY = 'token'
+MESSAGE_KEY_LIST = ('token', 'message', 'messages', 'directmessage')
 RESPONSE_KEY = 'response'
-ResponseInfo = namedtuple('ResponseInfo', [MESSAGE_KEY, TOKEN_KEY])
+ResponseInfo = namedtuple('ResponseInfo', [TYPE_KEY, TOKEN_KEY])
 
 def extract_json(json_msg:str) -> ResponseInfo:
   '''
@@ -25,8 +26,15 @@ def extract_json(json_msg:str) -> ResponseInfo:
   try:
     json_obj = json_to_dict(json_msg)
     response_dict = json_obj[RESPONSE_KEY]
-    message_type = response_dict[MESSAGE_KEY]
-    token = response_dict[TOKEN_KEY]
+    message_type = response_dict[TYPE_KEY]
+    token = ''
+
+    for key in MESSAGE_KEY_LIST:
+      if key in response_dict:
+        token = response_dict[key]
+        break
+
+    #token = response_dict[TOKEN_KEY]
   except json.JSONDecodeError:
     print("Json cannot be decoded.")
 
@@ -35,8 +43,8 @@ def extract_json(json_msg:str) -> ResponseInfo:
 def direct_message(send, recv, response_info, direct_message) -> ResponseInfo:
   json_msg = dict_to_json({"token" : response_info.token, "directmessage" : direct_message})
   send_json_to_server(send, json_msg)
-  return recv.readline()
-
+  response = recv.readline()
+  return extract_json(response)
 # turns a dictionary value into a json string
 def dict_to_json(command_dict) -> str:
   return str(command_dict).replace("\'", "\"")

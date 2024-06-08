@@ -120,17 +120,18 @@ def set_profile_bio(profile:Profile):
 # send message
 def send_message(profile:Profile):
 
+    port = 3021
     message = input("\nEnter message below:\n")
     print()
 
-    if send(profile.dsuserver[0], profile.dsuserver[1], profile.username, profile.password, message, profile.bio):
+    if send(profile.dsuserver, port, profile.username, profile.password, message, profile.bio):
         print(f"Your message \"{message}\" was sent successfully.\n")
     else:
         print("An error occurred when sending your message.\n")
 
 # main program
 def main():
-    server = ("168.235.86.101", 3021)
+    server = "168.235.86.101"
     print("Welcome to the DSU online post service!")
     print("Please enter your profile username and password below to begin.")
 

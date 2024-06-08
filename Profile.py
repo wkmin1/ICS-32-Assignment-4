@@ -17,7 +17,6 @@
 import json, time
 from pathlib import Path
 
-
 """
 DsuFileError is a custom exception handler that you should catch in your own code. It
 is raised when attempting to load or save Profile objects to file the system.
@@ -43,7 +42,7 @@ class Post(dict):
     when the entry object is set and an entry property that stores the post message.
 
     """
-    def __init__(self, entry:str = None, timestamp:float = 0):
+    def __init__(self, entry:str = None, timestamp:float = 0.0):
         self._timestamp = timestamp
         self.set_entry(entry)
 
@@ -79,7 +78,32 @@ class Post(dict):
     entry = property(get_entry, set_entry)
     timestamp = property(get_time, set_time)
     
-    
+class DirectMessage(Post):
+  def __init__(self, recipient:str = None, entry:str = None, timestamp:float = 0.0):
+    Post.__init__(self, entry, timestamp)
+    self.set_recipient(recipient)
+
+  def set_recipient(self, recipient:str):
+    self._recipient = recipient
+    dict.__setitem__(self, 'recipient', recipient)
+
+  def get_recipient(self):
+    return self._recipient
+  
+  '''
+  def __lt__ (self, other):
+    return self._timestamp < other._timestamp
+  
+  def __gt__ (self, other):
+    return other.__lt__(self)
+
+  def __eq__ (self, other):
+    return self._timestamp == other._timestamp
+
+  def __ne__ (self, other):
+    return not self.__eq__(other)
+    '''
+
 class Profile:
     """
     The Profile class exposes the properties required to join an ICS 32 DSU server. You 
@@ -99,7 +123,9 @@ class Profile:
         self.username = username # REQUIRED
         self.password = password # REQUIRED
         self.bio = ''            # OPTIONAL
-        self._posts = []         # OPTIONAL
+        self._dms = []         # OPTIONAL
+        self._contacts = []
+        self._other_dms = []
     
     """
 
@@ -112,7 +138,7 @@ class Profile:
     """
 
     def add_post(self, post: Post) -> None:
-        self._posts.append(post)
+        self._dms.append(post)
 
     """
 
@@ -126,7 +152,7 @@ class Profile:
 
     def del_post(self, index: int) -> bool:
         try:
-            del self._posts[index]
+            del self._dms[index]
             return True
         except IndexError:
             return False
@@ -138,7 +164,33 @@ class Profile:
 
     """
     def get_posts(self) -> list[Post]:
-        return self._posts
+        return self._dms
+    
+    def add_contact(self, contact:str) -> None:
+        self._contacts.append(contact)
+
+    def del_contact(self, index: int) -> bool:
+        try:
+            del self._contacts[index]
+            return True
+        except IndexError:
+            return False
+        
+    def get_contacts(self) -> list[Post]:
+        return self._contacts
+    
+    def add_other_post(self, direct_message) -> None:
+        self._other_dms.append(direct_message)
+
+    def del_other_post(self, index: int) -> bool:
+        try:
+            del self._other_dms[index]
+            return True
+        except IndexError:
+            return False
+        
+    def get_other_posts(self) -> list[Post]:
+        return self._other_dms
 
     """
 
@@ -156,15 +208,12 @@ class Profile:
     def save_profile(self, path: str) -> None:
         p = Path(path)
 
-        if p.exists() and p.suffix == '.dsu':
-            try:
-                f = open(p, 'w')
-                json.dump(self.__dict__, f)
-                f.close()
-            except Exception as ex:
-                raise DsuFileError("Error while attempting to process the DSU file.", ex)
-        else:
-            raise DsuFileError("Invalid DSU file path or type")
+        try:
+            f = open(p, 'w')
+            json.dump(self.__dict__, f)
+            f.close()
+        except Exception as ex:
+            raise DsuFileError("Error while attempting to process the DSU file.", ex)
 
     """
 
@@ -190,9 +239,14 @@ class Profile:
                 self.password = obj['password']
                 self.dsuserver = obj['dsuserver']
                 self.bio = obj['bio']
-                for post_obj in obj['_posts']:
-                    post = Post(post_obj['entry'], post_obj['timestamp'])
-                    self._posts.append(post)
+                for dm_obj in obj['_dms']:
+                    dm = DirectMessage(dm_obj['recipient'], dm_obj['entry'], dm_obj['timestamp'])
+                    self._dms.append(dm)
+                for contact_obj in obj['_contacts']:
+                    self._contacts.append(contact_obj)
+                for other_dm_obj in obj['_other_dms']:
+                    other_dm = DirectMessage(other_dm_obj['recipient'], other_dm_obj['entry'], other_dm_obj['timestamp'])
+                    self._other_dms.append(other_dm)
                 f.close()
             except Exception as ex:
                 raise DsuProfileError(ex)
