@@ -68,7 +68,9 @@ class DirectMessenger:
   def send(self, message:str, recipient:str) -> bool:
     try: 
       msg_time = time()
-      get_dm_response_info(self.profile, {"entry": message, "recipient":recipient, "timestamp": msg_time})
+      if get_dm_response_info(self.profile, {"entry": message, "recipient":recipient, "timestamp": msg_time}) is None:
+        raise ConnectionError
+
       self.profile.add_post(DirectMessage(recipient, message, msg_time))
 
       self.save_messenger()
